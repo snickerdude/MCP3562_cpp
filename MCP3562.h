@@ -13,6 +13,13 @@
 #include <Arduino.h>
 #include <SPI.h>
 
+struct AdcResults {
+    int32_t ch0;
+    int32_t ch1;
+    int32_t ch2;
+    int32_t ch3;
+};
+
 class MCP3564 {
   public:
     // csPin   = the microcontroller pin wired to the MCP3564's CS pin
@@ -33,6 +40,7 @@ class MCP3564 {
 
   private:
     uint8_t   _csPin;
+    uint8_t   _irqPin;
     SPIClass  &_spi;
     SPISettings _spiSettings;
 
