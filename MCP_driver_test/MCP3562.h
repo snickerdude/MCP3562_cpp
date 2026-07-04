@@ -1,14 +1,14 @@
 /*
- * MCP3564.h
+ * MCP3562.h
  *
- * Simple Arduino/ESP32 driver for the Microchip MCP3561/MCP3562/MCP3564(R)
+ * Simple Arduino/ESP32 driver for the Microchip MCP3561/MCP3562/MCP3562(R)
  * family of 24-bit Delta-Sigma ADCs (SPI interface).
  *
  * Datasheet: DS20006391C
  */
 
-#ifndef MCP3564_H
-#define MCP3564_H
+#ifndef MCP3562_H
+#define MCP3562_H
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -20,12 +20,13 @@ struct AdcResults {
     int32_t ch3;
 };
 
-class MCP3564 {
+class MCP3562 {
   public:
-    // csPin   = the microcontroller pin wired to the MCP3564's CS pin
+    // csPin   = the microcontroller pin wired to the MCP3562's CS pin
+	// irqPin  = the mcu pin that reads the interrupts from the MCP
     // spiBus  = which SPI bus to use (defaults to the board's primary SPI)
     // spiHz   = SPI clock speed in Hz (device supports up to 20 MHz)
-    MCP3564(uint8_t csPin, SPIClass &spiBus = SPI, uint32_t spiHz = 4000000);
+    MCP3562(uint8_t csPin, uint8_t irqPin, SPIClass &spiBus = SPI, uint32_t spiHz = 4000000);
     
     // Simple begin function to call in the arduino setup() code.
     // Only sets the ADC oscillator source to internal.
@@ -37,6 +38,12 @@ class MCP3564 {
     // Will return the data from the chose channel (0-3)
     // Single-ended conversions are measured against ground
     int32_t readChannel(uint8_t channel);
+	
+	// Will return a struct that contains the data from all 4 channels using a MUX scan
+	AdcResults readAllChannelsMux();
+	
+	// Will return a struct that contains the data from all 4 channels using SCAN mode
+	AdcResults readAllChannelsScan(); 
 
   private:
     uint8_t   _csPin;
@@ -70,12 +77,18 @@ class MCP3564 {
     
     // MUX Constants for Negative input connection to AGND (0x0C)
     static const uint8_t MUX_AGND = 0x0C;
+	static const uint8_t MUX_CH0 = 0x00;
+	static const uint8_t MUX_CH1 = 0x10;
+	static const uint8_t MUX_CH2 = 0x20;
+	static const uint8_t MUX_CH3 = 0x30;
+	
  
     uint8_t buildCommandByte(uint8_t addrOrFastCmd, uint8_t cmdType);
     void    writeRegister8(uint8_t addr, uint8_t value);
+	void 	writeRegister24(uint8_t addr, uint32_t value);
     uint8_t readRegister8(uint8_t addr);
     int32_t readRegister24(uint8_t addr);
     void    fastCommand(uint8_t fastCmd);
 };
 
-#endif // MCP3564_H
+#endif // MCP3562_H
