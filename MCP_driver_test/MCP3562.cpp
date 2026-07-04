@@ -25,7 +25,7 @@ void MCP3562::begin() {
   writeRegister8(REG_CONFIG0, 0xE3);
   
 	// CONFIG1: Reduce oversample ratio to increase samplerate
-	writeRegister8(REG_CONFIG1, 0x04);
+	//writeRegister8(REG_CONFIG1, 0x04);
 	
   // CONFIG3: One shot conversion to standby
   writeRegister8(REG_CONFIG3, 0x80);
@@ -42,6 +42,8 @@ AdcResults MCP3562::readAllChannelsMux() {
   
 	// disable scan mode in preperation for a MUX read. 
 	writeRegister8(REG_SCAN, 0x000000); 
+	
+	writeRegister8(REG_CONFIG3, 0x80);
 	
   // --- Channel 0 ---
   writeRegister8(REG_MUX, MUX_CH0 | MUX_AGND); // Set MUX to CH0 vs AGND
@@ -77,7 +79,9 @@ AdcResults MCP3562::readAllChannelsScan() {
 	AdcResults results;
 	
 	// Enable SCAN mode, 0 delay, channels 0-3 referenced to AGND
-	writeRegister8(REG_SCAN, 0x0000F);
+	writeRegister24(REG_SCAN, 0xE0000F);
+	
+	//writeRegister8(REG_CONFIG3, 0b10110000);
 	
 	// Begin the conversion
 	fastCommand(FASTCMD_CONV_START);
@@ -86,46 +90,32 @@ AdcResults MCP3562::readAllChannelsScan() {
 	while (digitalRead(_irqPin) == HIGH);
 	
 	// Execute an incremental read command
-	uint8_t command = buildCommandByte(REG_ADCDATA, CMDTYPE_INCR_RD);
+	//uint8_t command = buildCommandByte(REG_ADCDATA, CMDTYPE_STATIC_RD);
   
-  _spi.beginTransaction(_spiSettings);
-  digitalWrite(_csPin, LOW);
-  
-  _spi.transfer(command);
-	// --- Channel 0 (3 bytes) ---
-  int32_t raw0 = 0;
-  raw0 |= ((uint32_t)_spi.transfer(0x00)) << 16;
-  raw0 |= ((uint32_t)_spi.transfer(0x00)) << 8;
-  raw0 |= ((uint32_t)_spi.transfer(0x00));
-  if (raw0 & 0x800000) raw0 |= 0xFF000000;
-  results.ch0 = raw0;
+  //_spi.beginTransaction(_spiSettings);
+	//digitalWrite(_csPin, LOW);
+	//_spi.transfer(command);
+	uint32_t startTimee = millis();
+	for (int i = 0; i < 4; i++) {
+			//uint8_t statusToken = _spi.transfer(0x00); // Contains Channel ID bits
+			uint8_t channelNum; // Unpacks which channel this byte belongs to
+			
+			int32_t raw = readRegister24(REG_ADCDATA);
+			uint32_t finalValue = raw;
 
-  // --- Channel 1 (3 bytes) ---
-  int32_t raw1 = 0;
-  raw1 |= ((uint32_t)_spi.transfer(0x00)) << 16;
-  raw1 |= ((uint32_t)_spi.transfer(0x00)) << 8;
-  raw1 |= ((uint32_t)_spi.transfer(0x00));
-  if (raw1 & 0x800000) raw1 |= 0xFF000000;
-  results.ch1 = raw1;
-
-  // --- Channel 2 (3 bytes) ---
-  int32_t raw2 = 0;
-  raw2 |= ((uint32_t)_spi.transfer(0x00)) << 16;
-  raw2 |= ((uint32_t)_spi.transfer(0x00)) << 8;
-  raw2 |= ((uint32_t)_spi.transfer(0x00));
-  if (raw2 & 0x800000) raw2 |= 0xFF000000;
-  results.ch2 = raw2;
-
-  // --- Channel 3 (3 bytes) ---
-  int32_t raw3 = 0;
-  raw3 |= ((uint32_t)_spi.transfer(0x00)) << 16;
-  raw3 |= ((uint32_t)_spi.transfer(0x00)) << 8;
-  raw3 |= ((uint32_t)_spi.transfer(0x00));
-  if (raw3 & 0x800000) raw3 |= 0xFF000000;
-  results.ch3 = raw3;
-
-  digitalWrite(_csPin, HIGH);
-  _spi.endTransaction();
+			// Assign to the correct struct channel based on the hardware token
+			if (i == 0) results.ch0 = finalValue;
+			else if (i == 1) results.ch1 = finalValue;
+			else if (i == 2) results.ch2 = finalValue;
+			else if (i == 3) results.ch3 = finalValue;
+			while (digitalRead(_irqPin) == HIGH) {
+				if (millis() - startTimee > 10) {
+					Serial.println("Timed out");
+				}
+			}
+	}
+	digitalWrite(_csPin, HIGH);
+	_spi.endTransaction();
   
   return results;
 }
@@ -175,6 +165,25 @@ int32_t MCP3562::readRegister24(uint8_t addr) {
   _spi.beginTransaction(_spiSettings);
   digitalWrite(_csPin, LOW);
   _spi.transfer(command);
+  rawData |= ((uint32_t)_spi.transfer(0x00)) << 16;
+  rawData |= ((uint32_t)_spi.transfer(0x00)) << 8;
+  rawData |= ((uint32_t)_spi.transfer(0x00));
+  digitalWrite(_csPin, HIGH);
+  _spi.endTransaction();
+  
+  if (rawData & 0x800000) {
+    rawData |= 0xFF000000;
+  }
+  return rawData;
+}
+
+int32_t MCP3562::readRegister32(uint8_t addr) {
+  uint8_t command = buildCommandByte(addr, CMDTYPE_STATIC_RD);
+  int32_t rawData = 0;
+  _spi.beginTransaction(_spiSettings);
+  digitalWrite(_csPin, LOW);
+  _spi.transfer(command);
+	rawData |= ((uint32_t)_spi.transfer(0x00)) << 24;
   rawData |= ((uint32_t)_spi.transfer(0x00)) << 16;
   rawData |= ((uint32_t)_spi.transfer(0x00)) << 8;
   rawData |= ((uint32_t)_spi.transfer(0x00));

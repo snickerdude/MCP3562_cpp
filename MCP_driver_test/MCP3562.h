@@ -88,6 +88,7 @@ class MCP3562 {
 	void 	writeRegister24(uint8_t addr, uint32_t value);
     uint8_t readRegister8(uint8_t addr);
     int32_t readRegister24(uint8_t addr);
+	int32_t readRegister32(uint8_t addr);
     void    fastCommand(uint8_t fastCmd);
 };
 

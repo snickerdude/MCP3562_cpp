@@ -3,7 +3,7 @@
 
 #define ADC_CS_PIN  4 
 #define ADC_IRQ_PIN 5  // Connect to the IRQ/MDAT pin of MCP3564
-#define SPI_SPEED 20000000 // 20MHz SPi operation
+#define SPI_SPEED 15000000 // 20MHz SPi operation
 
 // Instantiate with CS and IRQ pins
 MCP3562 adc(ADC_CS_PIN, ADC_IRQ_PIN, SPI, SPI_SPEED);
@@ -38,7 +38,7 @@ void loop() {
   Serial.print("CH2: "); Serial.println(rslt.ch2);
   Serial.print("CH3: "); Serial.println(rslt.ch3);
   
+  //10000010010101011011111
   
-  
-  delay(100); 
+  delay(1000); 
 }
