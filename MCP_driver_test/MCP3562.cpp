@@ -22,10 +22,10 @@ MCP3562::MCP3562(uint8_t csPin, uint8_t irqPin, SPIClass &spiBus, uint32_t spiHz
 
 void MCP3562::begin() {
   // 1. CONFIG0: Internal Osc no output, Standby Mode (0xE3)
-  writeRegister8(REG_CONFIG0, 0xE3);
+  writeRegister8(REG_CONFIG0, 0x62);
   
 	// CONFIG1: Reduce oversample ratio to increase samplerate
-	//writeRegister8(REG_CONFIG1, 0x04);
+	writeRegister8(REG_CONFIG1, 0x08);
 	
   // CONFIG3: One shot conversion to standby
   writeRegister8(REG_CONFIG3, 0x80);
@@ -43,7 +43,7 @@ AdcResults MCP3562::readAllChannelsMux() {
 	// disable scan mode in preperation for a MUX read. 
 	writeRegister8(REG_SCAN, 0x000000); 
 	
-	writeRegister8(REG_CONFIG3, 0x80);
+	//writeRegister8(REG_CONFIG3, 0x80);
 	
   // --- Channel 0 ---
   writeRegister8(REG_MUX, MUX_CH0 | MUX_AGND); // Set MUX to CH0 vs AGND
@@ -79,40 +79,33 @@ AdcResults MCP3562::readAllChannelsScan() {
 	AdcResults results;
 	
 	// Enable SCAN mode, 0 delay, channels 0-3 referenced to AGND
-	writeRegister24(REG_SCAN, 0xE0000F);
-	
-	//writeRegister8(REG_CONFIG3, 0b10110000);
-	
+	writeRegister24(REG_SCAN, 0x00000F);
+		
 	// Begin the conversion
 	fastCommand(FASTCMD_CONV_START);
-	
-	// Wait for conversion to finish
-	while (digitalRead(_irqPin) == HIGH);
-	
-	// Execute an incremental read command
-	//uint8_t command = buildCommandByte(REG_ADCDATA, CMDTYPE_STATIC_RD);
-  
-  //_spi.beginTransaction(_spiSettings);
-	//digitalWrite(_csPin, LOW);
-	//_spi.transfer(command);
-	uint32_t startTimee = millis();
+	  
 	for (int i = 0; i < 4; i++) {
-			//uint8_t statusToken = _spi.transfer(0x00); // Contains Channel ID bits
-			uint8_t channelNum; // Unpacks which channel this byte belongs to
-			
-			int32_t raw = readRegister24(REG_ADCDATA);
-			uint32_t finalValue = raw;
+    int loops = 0;
+    while (digitalRead(_irqPin) == HIGH) {
+      if (loops ++ > 10000) break;
+    }
 
-			// Assign to the correct struct channel based on the hardware token
-			if (i == 0) results.ch0 = finalValue;
-			else if (i == 1) results.ch1 = finalValue;
-			else if (i == 2) results.ch2 = finalValue;
-			else if (i == 3) results.ch3 = finalValue;
-			while (digitalRead(_irqPin) == HIGH) {
-				if (millis() - startTimee > 10) {
-					Serial.println("Timed out");
-				}
-			}
+    int32_t raw = readRegister24(REG_ADCDATA);
+
+    // Assign to the correct struct channel based on the hardware token
+    switch (i) {
+      case 0:
+        results.ch3 = raw;
+        break;
+      case 1:
+        results.ch2 = raw;
+        break;
+      case 2:
+        results.ch1 = raw;
+        break;
+      case 3:
+        results.ch0 = raw;
+    }
 	}
 	digitalWrite(_csPin, HIGH);
 	_spi.endTransaction();
